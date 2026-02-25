@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Fishing Journal",
+    "slug": "fishing-journal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F8F5F0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to photograph your catches.",
+        "NSPhotoLibraryUsageDescription": "Used to select catch photos from your library.",
+        "NSLocationWhenInUseUsageDescription": "Used to tag catch locations automatically.",
+        "NSPhotoLibraryAddUsageDescription": "Used to save catch photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F8F5F0"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to select catch photos from your library.",
+          "cameraPermission": "Used to photograph your catches."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Used to read photo EXIF data for catch location and time.",
+          "savePhotosPermission": "Used to save catch photos.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ]
+  }
+}
