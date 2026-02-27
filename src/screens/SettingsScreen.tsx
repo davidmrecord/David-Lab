@@ -16,7 +16,7 @@ import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
 
-const BUILD_ID = 'v0.2.11 · 2026-02-27 build 3';
+const BUILD_ID = 'v0.2.12 · 2026-02-27 build 4';
 
 type Props = JournalScreenProps<'Settings'>;
 
