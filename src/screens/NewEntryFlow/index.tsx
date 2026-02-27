@@ -154,19 +154,6 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
     const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
 
-    // DEBUG: dump raw API results into notes so we can see what came back
-    const fishDetail = fishResult.status === 'rejected'
-      ? `ERROR: ${String(fishResult.reason)}`
-      : JSON.stringify(fishResult.value);
-    const debugNote = [
-      `lat=${latitude ?? 'null'} lng=${longitude ?? 'null'}`,
-      `photoUri=${photoUri}`,
-      `fish: ${fishResult.status} | ${fishDetail}`,
-      `geo: ${geoResult.status} | ${JSON.stringify(geo)}`,
-      `weather: ${weatherResult.status} | ${JSON.stringify(weather)}`,
-    ].join('\n');
-    setNotes(debugNote);
-
     setReview(r => ({
       ...r,
       photoUri,
