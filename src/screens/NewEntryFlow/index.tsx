@@ -56,16 +56,6 @@ export default function NewEntryFlow({ route, navigation }: Props) {
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
   const { isOffline } = useNetworkStatus();
 
-  // If offline, skip straight to the offline form
-  if (isOffline) {
-    return (
-      <OfflineEntryForm
-        initialTripId={initialTripId}
-        onSaved={() => navigation.goBack()}
-      />
-    );
-  }
-
   const [step, setStep] = useState<Step>('photo');
   const [progress, setProgress] = useState(0);
   const [review, setReview] = useState<ReviewData>({
@@ -95,6 +85,16 @@ export default function NewEntryFlow({ route, navigation }: Props) {
   React.useEffect(() => {
     getAllTripsWithCatches().then(setTrips);
   }, []);
+
+  // If offline, skip straight to the offline form
+  if (isOffline) {
+    return (
+      <OfflineEntryForm
+        initialTripId={initialTripId}
+        onSaved={() => navigation.goBack()}
+      />
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Photo step
