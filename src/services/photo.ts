@@ -13,7 +13,7 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   if (status !== 'granted') return null;
 
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ['images'],
     quality: 0.85,
     exif: true,
     allowsEditing: false,
