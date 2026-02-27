@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
 
 export interface PhotoResult {
   uri: string;
@@ -9,7 +10,14 @@ export interface PhotoResult {
 
 export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== 'granted') return null;
+  if (status !== 'granted') {
+    Alert.alert(
+      'Photo Access Required',
+      'Please go to Settings → Expo Go → Photos and allow access.',
+      [{ text: 'OK' }]
+    );
+    return null;
+  }
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
