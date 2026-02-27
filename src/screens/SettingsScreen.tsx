@@ -6,22 +6,29 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../theme/ThemeContext';
 import { getSetting, setSetting, persistPhoto } from '../db/database';
 import { pickPhotoFromLibrary } from '../services/photo';
 import {
-  saveToken,
-  clearToken,
-  getTokenStatus,
+  exchangeAndStoreToken,
+  signOut,
+  isSignedIn,
+  redirectUri,
+  CLIENT_ID,
+  INAT_AUTHORIZATION_ENDPOINT,
 } from '../services/iNaturalistAuth';
 import { PALETTES } from '../theme/palettes';
 import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
+
+// Required for the OAuth redirect to close the browser and return to the app.
+WebBrowser.maybeCompleteAuthSession();
 
 const BUILD_ID = 'v0.2.14 · 2026-02-27 build 6';
 
@@ -31,44 +38,52 @@ export default function SettingsScreen({ navigation }: Props) {
   const { colors: COLORS, themeName, setTheme } = useTheme();
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [inatSignedIn, setInatSignedIn] = useState(false);
+  const [inatLoading, setInatLoading] = useState(false);
 
-  // iNaturalist token state
-  const [inatSaved, setInatSaved] = useState(false);
-  const [inatExpired, setInatExpired] = useState(false);
-  const [inatTokenInput, setInatTokenInput] = useState('');
+  // OAuth Authorization Code request — iNaturalist doesn't support PKCE.
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    { clientId: CLIENT_ID, redirectUri, responseType: 'code', usePKCE: false },
+    { authorizationEndpoint: INAT_AUTHORIZATION_ENDPOINT },
+  );
 
-  const refreshInatStatus = useCallback(async () => {
-    const status = await getTokenStatus();
-    setInatSaved(status.saved);
-    setInatExpired(status.expired);
+  const refreshSignInStatus = useCallback(async () => {
+    setInatSignedIn(await isSignedIn());
   }, []);
 
   useEffect(() => {
     getSetting('avatar_uri').then(v => setAvatarUri(v));
-    refreshInatStatus();
-  }, [refreshInatStatus]);
+    refreshSignInStatus();
+  }, [refreshSignInStatus]);
 
-  const handleSaveToken = async () => {
-    const trimmed = inatTokenInput.trim();
-    if (!trimmed) return;
-    try {
-      await saveToken(trimmed);
-      setInatTokenInput('');
-      await refreshInatStatus();
-    } catch (e: any) {
-      Alert.alert('Invalid token', e.message ?? 'Could not save token.');
+  // Handle the OAuth browser redirect response.
+  useEffect(() => {
+    if (!response) return;
+    if (response.type === 'success') {
+      const { code } = response.params;
+      setInatLoading(true);
+      exchangeAndStoreToken(code)
+        .then(refreshSignInStatus)
+        .catch(e => Alert.alert('Sign in failed', e.message ?? 'Could not complete sign-in.'))
+        .finally(() => setInatLoading(false));
+    } else if (response.type === 'error') {
+      Alert.alert('Sign in failed', response.error?.message ?? 'Sign-in was cancelled.');
     }
+  }, [response, refreshSignInStatus]);
+
+  const handleSignIn = () => {
+    promptAsync();
   };
 
-  const handleClearToken = () => {
-    Alert.alert('Remove token', 'Fish ID will stop working until you add a new token.', [
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Fish ID will stop working until you sign in again.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove',
+        text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          await clearToken();
-          await refreshInatStatus();
+          await signOut();
+          await refreshSignInStatus();
         },
       },
     ]);
@@ -112,44 +127,34 @@ export default function SettingsScreen({ navigation }: Props) {
 
       {/* iNaturalist */}
       <Text style={styles.sectionTitle}>Fish ID (iNaturalist)</Text>
-      {inatSaved && !inatExpired ? (
-        <View style={styles.inatCard}>
-          <Text style={styles.inatStatus}>Token active — fish ID enabled</Text>
-          <TouchableOpacity onPress={handleClearToken} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>Remove token</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.inatCard}>
-          {inatSaved && inatExpired && (
-            <Text style={styles.inatExpired}>Token expired — paste a new one below.</Text>
-          )}
-          <Text style={styles.inatInstructions}>
-            {'1. Log in at inaturalist.org\n2. Go to inaturalist.org/users/api_token\n3. Copy and paste the token here'}
-          </Text>
-          <TextInput
-            style={styles.tokenInput}
-            placeholder="Paste token here…"
-            placeholderTextColor={COLORS.textSecondary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline
-            numberOfLines={3}
-            value={inatTokenInput}
-            onChangeText={setInatTokenInput}
-          />
-          <TouchableOpacity
-            style={[styles.saveBtn, !inatTokenInput.trim() && { opacity: 0.4 }]}
-            onPress={handleSaveToken}
-            disabled={!inatTokenInput.trim()}
-          >
-            <Text style={styles.saveBtnText}>Save token</Text>
-          </TouchableOpacity>
-          <Text style={styles.inatHint}>
-            Tokens expire after 24 hours. Return here to refresh if fish ID stops working.
-          </Text>
-        </View>
-      )}
+      <View style={styles.inatCard}>
+        {inatSignedIn ? (
+          <>
+            <Text style={styles.inatStatus}>Connected — fish ID enabled</Text>
+            <Text style={styles.inatHint}>
+              Your session is active. The app refreshes credentials automatically.
+            </Text>
+            <TouchableOpacity onPress={handleSignOut} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>Sign out</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.inatHint}>
+              Sign in to enable automatic fish identification. Supports Google login.
+            </Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, (!request || inatLoading) && { opacity: 0.5 }]}
+              onPress={handleSignIn}
+              disabled={!request || inatLoading}
+            >
+              <Text style={styles.saveBtnText}>
+                {inatLoading ? 'Signing in…' : 'Sign in with iNaturalist'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
 
       <Text style={styles.buildId}>{BUILD_ID}</Text>
     </ScrollView>
@@ -275,35 +280,12 @@ function makeStyles(COLORS: ColorPalette) {
       color: COLORS.primary,
       fontWeight: String(FONT.semibold) as any,
     },
-    inatExpired: {
-      fontSize: FONT.sm,
-      color: COLORS.danger ?? '#C0392B',
-      fontWeight: String(FONT.medium) as any,
-    },
     clearBtn: {
       alignSelf: 'flex-start',
     },
     clearBtnText: {
       fontSize: FONT.sm,
       color: COLORS.danger ?? '#C0392B',
-    },
-    inatInstructions: {
-      fontSize: FONT.sm,
-      color: COLORS.textSecondary,
-      lineHeight: 20,
-    },
-    tokenInput: {
-      backgroundColor: COLORS.surfaceAlt,
-      borderRadius: RADIUS.sm,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      fontSize: 12,
-      color: COLORS.text,
-      fontFamily: 'monospace',
-      minHeight: 72,
-      textAlignVertical: 'top',
     },
     saveBtn: {
       backgroundColor: COLORS.primary,
