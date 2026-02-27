@@ -81,6 +81,7 @@ export default function NewEntryFlow({ route, navigation }: Props) {
   const [selectedTripId, setSelectedTripId] = useState<number | undefined>(initialTripId);
   const [tripSectionOpen, setTripSectionOpen] = useState(!!initialTripId);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   React.useEffect(() => {
     getAllTripsWithCatches().then(setTrips);
@@ -108,8 +109,20 @@ export default function NewEntryFlow({ route, navigation }: Props) {
       return;
     }
 
-    const result =
-      source === 'camera' ? await takePhoto() : await pickPhotoFromLibrary();
+    if (picking) return;
+    setPicking(true);
+
+    let result;
+    try {
+      result = source === 'camera' ? await takePhoto() : await pickPhotoFromLibrary();
+    } catch (err) {
+      Alert.alert('Error', 'Could not open photo picker. Please try again.');
+      setPicking(false);
+      return;
+    } finally {
+      setPicking(false);
+    }
+
     if (!result) return;
 
     const photoUri = result.uri;
@@ -122,11 +135,11 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     setTripSectionOpen(true);
     setProgress(0);
 
-    // Run all three API calls in parallel
+    // Run all three API calls in parallel.
+    // identifyFish only needs the photo URI — do not gate it on GPS.
+    // Weather and geocoding require coordinates.
     const [fishResult, weatherResult, geoResult] = await Promise.allSettled([
-      latitude && longitude
-        ? identifyFish(photoUri).finally(() => setProgress(p => p + 0.34))
-        : Promise.resolve(null).then(v => { setProgress(p => p + 0.34); return v; }),
+      identifyFish(photoUri).finally(() => setProgress(p => p + 0.34)),
       latitude && longitude
         ? fetchHistoricalWeather(latitude, longitude, caughtAt).finally(() =>
             setProgress(p => p + 0.33)
@@ -219,15 +232,29 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     return (
       <View style={styles.center}>
         <Text style={styles.stepTitle}>Log a catch</Text>
-        <TouchableOpacity style={styles.bigBtn} onPress={() => handlePhotoChoice('camera')}>
+        <TouchableOpacity
+          style={[styles.bigBtn, picking && { opacity: 0.5 }]}
+          onPress={() => handlePhotoChoice('camera')}
+          disabled={picking}
+        >
           <Text style={styles.bigBtnIcon}>📷</Text>
           <Text style={styles.bigBtnText}>Take Photo</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.bigBtn} onPress={() => handlePhotoChoice('library')}>
+        <TouchableOpacity
+          style={[styles.bigBtn, picking && { opacity: 0.5 }]}
+          onPress={() => handlePhotoChoice('library')}
+          disabled={picking}
+        >
           <Text style={styles.bigBtnIcon}>🖼</Text>
-          <Text style={styles.bigBtnText}>Choose from Library</Text>
+          <Text style={styles.bigBtnText}>
+            {picking ? 'Opening…' : 'Choose from Library'}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.skipBtn} onPress={() => handlePhotoChoice('skip')}>
+        <TouchableOpacity
+          style={styles.skipBtn}
+          onPress={() => handlePhotoChoice('skip')}
+          disabled={picking}
+        >
           <Text style={styles.skipBtnText}>Skip — enter manually</Text>
         </TouchableOpacity>
       </View>

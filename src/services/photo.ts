@@ -21,12 +21,18 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
     return null;
   }
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    quality: 0.85,
-    exif: true,
-    allowsEditing: false,
-  });
+  let result;
+  try {
+    result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      exif: true,
+      allowsEditing: false,
+    });
+  } catch (err) {
+    Alert.alert('Error', 'Could not open photo library. Please try again.');
+    return null;
+  }
 
   if (result.canceled || !result.assets?.[0]) return null;
   return extractAssetData(result.assets[0]);
@@ -45,10 +51,16 @@ export async function takePhoto(): Promise<PhotoResult | null> {
     return null;
   }
 
-  const result = await ImagePicker.launchCameraAsync({
-    quality: 0.85,
-    exif: true,
-  });
+  let result;
+  try {
+    result = await ImagePicker.launchCameraAsync({
+      quality: 0.85,
+      exif: true,
+    });
+  } catch (err) {
+    Alert.alert('Error', 'Could not open camera. Please try again.');
+    return null;
+  }
 
   if (result.canceled || !result.assets?.[0]) return null;
   return extractAssetData(result.assets[0]);
