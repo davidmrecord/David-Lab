@@ -1,4 +1,5 @@
 import type { SpeciesSuggestion } from '../types';
+import { getApiToken } from './iNaturalistAuth';
 
 const API_URL = 'https://api.inaturalist.org/v1/computervision/score_image';
 
@@ -11,18 +12,24 @@ export interface FishIdResult {
 }
 
 export async function identifyFish(photoUri: string): Promise<FishIdResult> {
+  const token = await getApiToken();
+  if (!token) {
+    throw new Error('Not connected to iNaturalist. Go to Settings to log in.');
+  }
+
   const formData = new FormData();
   formData.append('image', {
     uri: photoUri,
     type: 'image/jpeg',
     name: 'catch.jpg',
   } as any);
-  // taxon_id is omitted — it requires auth on iNaturalist's API.
-  // Fish filtering is handled client-side below.
 
   const response = await fetch(API_URL, {
     method: 'POST',
-    headers: { 'User-Agent': 'FishingJournal/1 (mobile app)' },
+    headers: {
+      'User-Agent': 'FishingJournal/1 (mobile app)',
+      Authorization: `Bearer ${token}`,
+    },
     body: formData,
   });
 
