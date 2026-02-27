@@ -13,7 +13,7 @@ import {
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../theme/ThemeContext';
-import { getSetting, setSetting, persistPhoto } from '../db/database';
+import { setSetting, persistPhoto } from '../db/database';
 import { pickPhotoFromLibrary } from '../services/photo';
 import {
   exchangeAndStoreToken,
@@ -39,9 +39,8 @@ const BUILD_ID = 'v0.2.14 · 2026-02-27 build 6';
 type Props = JournalScreenProps<'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
-  const { colors: COLORS, themeName, setTheme } = useTheme();
+  const { colors: COLORS, themeName, setTheme, avatarUri, setAvatarUri } = useTheme();
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [inatSignedIn, setInatSignedIn] = useState(false);
   const [inatLoading, setInatLoading] = useState(false);
   const [inatTokenSaved, setInatTokenSaved] = useState(false);
@@ -62,7 +61,6 @@ export default function SettingsScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    getSetting('avatar_uri').then(v => setAvatarUri(v));
     refreshSignInStatus();
   }, [refreshSignInStatus]);
 
@@ -128,9 +126,13 @@ export default function SettingsScreen({ navigation }: Props) {
   const handlePickAvatar = async () => {
     const result = await pickPhotoFromLibrary();
     if (!result) return;
-    const uri = await persistPhoto(result.uri);
-    await setSetting('avatar_uri', uri);
-    setAvatarUri(uri);
+    try {
+      const uri = await persistPhoto(result.uri);
+      await setSetting('avatar_uri', uri);
+      setAvatarUri(uri); // updates ThemeContext → AppShell background reflects immediately
+    } catch (e: any) {
+      Alert.alert('Error', 'Could not save profile photo. Please try again.');
+    }
   };
 
   return (

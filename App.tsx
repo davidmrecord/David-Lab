@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { initDatabase } from './src/db/database';
-import { ThemeProvider } from './src/theme/ThemeContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import OfflineBanner from './src/components/OfflineBanner';
 import TroutLoader from './src/components/TroutLoader';
@@ -61,16 +61,34 @@ export default function App() {
 }
 
 function AppShell() {
+  const { avatarUri } = useTheme();
   return (
-    <>
+    <View style={styles.shell}>
       <StatusBar style="light" />
       <AppNavigator />
       <OfflineBanner />
-    </>
+      {avatarUri && (
+        <View style={styles.avatarBackground} pointerEvents="none">
+          <Image
+            source={{ uri: avatarUri }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+            blurRadius={8}
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  shell: {
+    flex: 1,
+  },
+  avatarBackground: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.07,
+  },
   splash: {
     flex: 1,
     alignItems: 'center',
