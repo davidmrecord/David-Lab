@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fishing Journal",
     "slug": "fishing-journal",
-    "version": "1.0.0",
+    "version": "0.2.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
