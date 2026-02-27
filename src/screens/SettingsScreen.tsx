@@ -1,22 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { getSetting, setSetting, persistPhoto } from '../db/database';
 import { pickPhotoFromLibrary } from '../services/photo';
+import {
+  loginWithCredentials,
+  logout as inatLogout,
+  getConnectedUsername,
+} from '../services/iNaturalistAuth';
 import { PALETTES } from '../theme/palettes';
 import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
 
-const BUILD_ID = 'v0.2.12 · 2026-02-27 build 4';
+const BUILD_ID = 'v0.2.13 · 2026-02-27 build 5';
 
 type Props = JournalScreenProps<'Settings'>;
 
@@ -25,9 +33,45 @@ export default function SettingsScreen({ navigation }: Props) {
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
+  // iNaturalist auth state
+  const [inatUsername, setInatUsername] = useState<string | null>(null);
+  const [inatLoginUser, setInatLoginUser] = useState('');
+  const [inatLoginPass, setInatLoginPass] = useState('');
+  const [inatConnecting, setInatConnecting] = useState(false);
+
   useEffect(() => {
     getSetting('avatar_uri').then(v => setAvatarUri(v));
+    getConnectedUsername().then(u => setInatUsername(u));
   }, []);
+
+  const handleInatLogin = async () => {
+    if (!inatLoginUser.trim() || !inatLoginPass) return;
+    setInatConnecting(true);
+    try {
+      await loginWithCredentials(inatLoginUser.trim(), inatLoginPass);
+      setInatUsername(inatLoginUser.trim());
+      setInatLoginUser('');
+      setInatLoginPass('');
+    } catch (e: any) {
+      Alert.alert('Login failed', e.message ?? 'Unknown error');
+    } finally {
+      setInatConnecting(false);
+    }
+  };
+
+  const handleInatLogout = () => {
+    Alert.alert('Disconnect iNaturalist', 'Fish ID will stop working until you log in again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: async () => {
+          await inatLogout();
+          setInatUsername(null);
+        },
+      },
+    ]);
+  };
 
   const handlePickAvatar = async () => {
     const result = await pickPhotoFromLibrary();
@@ -64,6 +108,54 @@ export default function SettingsScreen({ navigation }: Props) {
           />
         ))}
       </View>
+
+      {/* iNaturalist */}
+      <Text style={styles.sectionTitle}>Fish ID (iNaturalist)</Text>
+      {inatUsername ? (
+        <View style={styles.inatRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.inatConnected}>Connected</Text>
+            <Text style={styles.inatUser}>{inatUsername}</Text>
+          </View>
+          <TouchableOpacity onPress={handleInatLogout} style={styles.disconnectBtn}>
+            <Text style={styles.disconnectText}>Disconnect</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.inatForm}>
+          <TextInput
+            style={styles.input}
+            placeholder="iNaturalist username"
+            placeholderTextColor={COLORS.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={inatLoginUser}
+            onChangeText={setInatLoginUser}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={COLORS.textSecondary}
+            secureTextEntry
+            value={inatLoginPass}
+            onChangeText={setInatLoginPass}
+          />
+          <TouchableOpacity
+            style={[styles.connectBtn, inatConnecting && { opacity: 0.6 }]}
+            onPress={handleInatLogin}
+            disabled={inatConnecting}
+          >
+            {inatConnecting ? (
+              <ActivityIndicator color={COLORS.textOnPrimary} />
+            ) : (
+              <Text style={styles.connectText}>Connect</Text>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.inatHint}>
+            Free account at inaturalist.org — required for automatic fish ID from photos.
+          </Text>
+        </View>
+      )}
 
       <Text style={styles.buildId}>{BUILD_ID}</Text>
     </ScrollView>
@@ -175,6 +267,69 @@ function makeStyles(COLORS: ColorPalette) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
+    },
+    inatRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: SPACING.md,
+      marginBottom: SPACING.md,
+    },
+    inatConnected: {
+      fontSize: FONT.sm,
+      color: COLORS.primary,
+      fontWeight: String(FONT.semibold) as any,
+    },
+    inatUser: {
+      fontSize: FONT.md,
+      color: COLORS.text,
+      marginTop: 2,
+    },
+    disconnectBtn: {
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+    },
+    disconnectText: {
+      fontSize: FONT.sm,
+      color: COLORS.danger ?? '#C0392B',
+    },
+    inatForm: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: SPACING.md,
+      marginBottom: SPACING.md,
+      gap: SPACING.sm,
+    },
+    input: {
+      backgroundColor: COLORS.surfaceAlt,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      fontSize: FONT.md,
+      color: COLORS.text,
+    },
+    connectBtn: {
+      backgroundColor: COLORS.primary,
+      borderRadius: RADIUS.sm,
+      paddingVertical: SPACING.sm,
+      alignItems: 'center',
+    },
+    connectText: {
+      color: COLORS.textOnPrimary,
+      fontWeight: String(FONT.semibold) as any,
+      fontSize: FONT.md,
+    },
+    inatHint: {
+      fontSize: 12,
+      color: COLORS.textSecondary,
+      lineHeight: 17,
     },
     buildId: {
       fontSize: 11,
