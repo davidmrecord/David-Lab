@@ -33,7 +33,10 @@ export async function identifyFish(photoUri: string): Promise<FishIdResult> {
 
   const suggestions: SpeciesSuggestion[] = results
     .filter((r: any) => {
-      const ancestorIds: number[] = r.taxon?.ancestor_ids ?? [];
+      // ancestor_ids may be absent in computervision responses; fall back to
+      // trusting the taxon_id param we already sent to scope results to fish.
+      const ancestorIds: number[] | undefined = r.taxon?.ancestor_ids;
+      if (!ancestorIds?.length) return true;
       return FISH_TAXON_IDS.some(id => ancestorIds.includes(id));
     })
     .slice(0, 5)
