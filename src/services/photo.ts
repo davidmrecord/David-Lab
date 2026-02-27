@@ -9,8 +9,11 @@ export interface PhotoResult {
 }
 
 export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
-  const { status } = await MediaLibrary.requestPermissionsAsync();
-  if (status !== 'granted') return null;
+  const [mediaLib, imagePicker] = await Promise.all([
+    MediaLibrary.requestPermissionsAsync(),
+    ImagePicker.requestMediaLibraryPermissionsAsync(),
+  ]);
+  if (mediaLib.status !== 'granted' && imagePicker.status !== 'granted') return null;
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
