@@ -17,11 +17,19 @@ export async function identifyFish(photoUri: string): Promise<FishIdResult> {
     throw new Error('No iNaturalist token. Paste one in Settings → Fish ID.');
   }
 
+  // Detect the actual image format from the URI so we don't claim a PNG is a JPEG.
+  // (expo-image-picker skips JPEG conversion for PNGs even when quality < 1.)
+  const uriPath = photoUri.split('?')[0].toLowerCase();
+  const isPng = uriPath.endsWith('.png');
+  const isWebp = uriPath.endsWith('.webp');
+  const mimeType = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
+  const fileName = isPng ? 'catch.png' : isWebp ? 'catch.webp' : 'catch.jpg';
+
   const formData = new FormData();
   formData.append('image', {
     uri: photoUri,
-    type: 'image/jpeg',
-    name: 'catch.jpg',
+    type: mimeType,
+    name: fileName,
   } as any);
 
   const response = await fetch(API_URL, {
