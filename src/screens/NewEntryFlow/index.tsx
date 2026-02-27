@@ -154,12 +154,6 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
     const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
 
-    // DEBUG
-    const fishDetail = fishResult.status === 'rejected'
-      ? `ERR: ${String(fishResult.reason)}`
-      : JSON.stringify(fishResult.value);
-    setNotes(`fish: ${fishResult.status}\n${fishDetail}`);
-
     setReview(r => ({
       ...r,
       photoUri,
