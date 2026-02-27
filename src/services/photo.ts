@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 export interface PhotoResult {
   uri: string;
@@ -11,11 +11,13 @@ export interface PhotoResult {
 export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== 'granted') {
-    Alert.alert(
-      'Photo Access Required',
-      'Please go to Settings → Expo Go → Photos and allow access.',
-      [{ text: 'OK' }]
-    );
+    const message = Platform.OS === 'ios'
+      ? 'Please go to Settings → Expo Go → Photos and allow access.'
+      : 'Please go to Settings → Apps → Expo Go → Permissions → Photos and videos.';
+    Alert.alert('Photo Access Required', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => Linking.openSettings() },
+    ]);
     return null;
   }
 
@@ -32,7 +34,16 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
 
 export async function takePhoto(): Promise<PhotoResult | null> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== 'granted') return null;
+  if (status !== 'granted') {
+    const message = Platform.OS === 'ios'
+      ? 'Please go to Settings → Expo Go → Camera and allow access.'
+      : 'Please go to Settings → Apps → Expo Go → Permissions → Camera.';
+    Alert.alert('Camera Access Required', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => Linking.openSettings() },
+    ]);
+    return null;
+  }
 
   const result = await ImagePicker.launchCameraAsync({
     quality: 0.85,
