@@ -1,5 +1,4 @@
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 
 export interface PhotoResult {
   uri: string;
@@ -9,11 +8,8 @@ export interface PhotoResult {
 }
 
 export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
-  const [mediaLib, imagePicker] = await Promise.all([
-    MediaLibrary.requestPermissionsAsync(),
-    ImagePicker.requestMediaLibraryPermissionsAsync(),
-  ]);
-  if (mediaLib.status !== 'granted' && imagePicker.status !== 'granted') return null;
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') return null;
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
