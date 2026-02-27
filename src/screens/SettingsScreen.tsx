@@ -16,6 +16,8 @@ import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
 
+const BUILD_ID = '2026-02-27 build 2';
+
 type Props = JournalScreenProps<'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
@@ -62,6 +64,8 @@ export default function SettingsScreen({ navigation }: Props) {
           />
         ))}
       </View>
+
+      <Text style={styles.buildId}>{BUILD_ID}</Text>
     </ScrollView>
   );
 }
@@ -171,6 +175,14 @@ function makeStyles(COLORS: ColorPalette) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
+    },
+    buildId: {
+      fontSize: 11,
+      color: COLORS.textSecondary,
+      textAlign: 'center',
+      marginTop: SPACING.xl,
+      marginBottom: SPACING.md,
+      opacity: 0.5,
     },
   });
 }
