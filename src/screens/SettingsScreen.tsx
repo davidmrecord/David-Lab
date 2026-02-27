@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -15,16 +14,16 @@ import { useTheme } from '../theme/ThemeContext';
 import { getSetting, setSetting, persistPhoto } from '../db/database';
 import { pickPhotoFromLibrary } from '../services/photo';
 import {
-  loginWithCredentials,
-  logout as inatLogout,
-  getConnectedUsername,
+  saveToken,
+  clearToken,
+  getTokenStatus,
 } from '../services/iNaturalistAuth';
 import { PALETTES } from '../theme/palettes';
 import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
 
-const BUILD_ID = 'v0.2.13 · 2026-02-27 build 5';
+const BUILD_ID = 'v0.2.14 · 2026-02-27 build 6';
 
 type Props = JournalScreenProps<'Settings'>;
 
@@ -33,41 +32,43 @@ export default function SettingsScreen({ navigation }: Props) {
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  // iNaturalist auth state
-  const [inatUsername, setInatUsername] = useState<string | null>(null);
-  const [inatLoginUser, setInatLoginUser] = useState('');
-  const [inatLoginPass, setInatLoginPass] = useState('');
-  const [inatConnecting, setInatConnecting] = useState(false);
+  // iNaturalist token state
+  const [inatSaved, setInatSaved] = useState(false);
+  const [inatExpired, setInatExpired] = useState(false);
+  const [inatTokenInput, setInatTokenInput] = useState('');
+
+  const refreshInatStatus = useCallback(async () => {
+    const status = await getTokenStatus();
+    setInatSaved(status.saved);
+    setInatExpired(status.expired);
+  }, []);
 
   useEffect(() => {
     getSetting('avatar_uri').then(v => setAvatarUri(v));
-    getConnectedUsername().then(u => setInatUsername(u));
-  }, []);
+    refreshInatStatus();
+  }, [refreshInatStatus]);
 
-  const handleInatLogin = async () => {
-    if (!inatLoginUser.trim() || !inatLoginPass) return;
-    setInatConnecting(true);
+  const handleSaveToken = async () => {
+    const trimmed = inatTokenInput.trim();
+    if (!trimmed) return;
     try {
-      await loginWithCredentials(inatLoginUser.trim(), inatLoginPass);
-      setInatUsername(inatLoginUser.trim());
-      setInatLoginUser('');
-      setInatLoginPass('');
+      await saveToken(trimmed);
+      setInatTokenInput('');
+      await refreshInatStatus();
     } catch (e: any) {
-      Alert.alert('Login failed', e.message ?? 'Unknown error');
-    } finally {
-      setInatConnecting(false);
+      Alert.alert('Invalid token', e.message ?? 'Could not save token.');
     }
   };
 
-  const handleInatLogout = () => {
-    Alert.alert('Disconnect iNaturalist', 'Fish ID will stop working until you log in again.', [
+  const handleClearToken = () => {
+    Alert.alert('Remove token', 'Fish ID will stop working until you add a new token.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Disconnect',
+        text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await inatLogout();
-          setInatUsername(null);
+          await clearToken();
+          await refreshInatStatus();
         },
       },
     ]);
@@ -111,48 +112,41 @@ export default function SettingsScreen({ navigation }: Props) {
 
       {/* iNaturalist */}
       <Text style={styles.sectionTitle}>Fish ID (iNaturalist)</Text>
-      {inatUsername ? (
-        <View style={styles.inatRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.inatConnected}>Connected</Text>
-            <Text style={styles.inatUser}>{inatUsername}</Text>
-          </View>
-          <TouchableOpacity onPress={handleInatLogout} style={styles.disconnectBtn}>
-            <Text style={styles.disconnectText}>Disconnect</Text>
+      {inatSaved && !inatExpired ? (
+        <View style={styles.inatCard}>
+          <Text style={styles.inatStatus}>Token active — fish ID enabled</Text>
+          <TouchableOpacity onPress={handleClearToken} style={styles.clearBtn}>
+            <Text style={styles.clearBtnText}>Remove token</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.inatForm}>
+        <View style={styles.inatCard}>
+          {inatSaved && inatExpired && (
+            <Text style={styles.inatExpired}>Token expired — paste a new one below.</Text>
+          )}
+          <Text style={styles.inatInstructions}>
+            {'1. Log in at inaturalist.org\n2. Go to inaturalist.org/users/api_token\n3. Copy and paste the token here'}
+          </Text>
           <TextInput
-            style={styles.input}
-            placeholder="iNaturalist username"
+            style={styles.tokenInput}
+            placeholder="Paste token here…"
             placeholderTextColor={COLORS.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
-            value={inatLoginUser}
-            onChangeText={setInatLoginUser}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={COLORS.textSecondary}
-            secureTextEntry
-            value={inatLoginPass}
-            onChangeText={setInatLoginPass}
+            multiline
+            numberOfLines={3}
+            value={inatTokenInput}
+            onChangeText={setInatTokenInput}
           />
           <TouchableOpacity
-            style={[styles.connectBtn, inatConnecting && { opacity: 0.6 }]}
-            onPress={handleInatLogin}
-            disabled={inatConnecting}
+            style={[styles.saveBtn, !inatTokenInput.trim() && { opacity: 0.4 }]}
+            onPress={handleSaveToken}
+            disabled={!inatTokenInput.trim()}
           >
-            {inatConnecting ? (
-              <ActivityIndicator color={COLORS.textOnPrimary} />
-            ) : (
-              <Text style={styles.connectText}>Connect</Text>
-            )}
+            <Text style={styles.saveBtnText}>Save token</Text>
           </TouchableOpacity>
           <Text style={styles.inatHint}>
-            Free account at inaturalist.org — required for automatic fish ID from photos.
+            Tokens expire after 24 hours. Return here to refresh if fish ID stops working.
           </Text>
         </View>
       )}
@@ -171,7 +165,6 @@ function PaletteCard({
   selected: boolean;
   onPress: () => void;
 }) {
-  // Preview card showing exactly how a trip card will look
   return (
     <Pressable
       onPress={onPress}
@@ -268,35 +261,7 @@ function makeStyles(COLORS: ColorPalette) {
       flexWrap: 'wrap',
       justifyContent: 'space-between',
     },
-    inatRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: COLORS.surface,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      padding: SPACING.md,
-      marginBottom: SPACING.md,
-    },
-    inatConnected: {
-      fontSize: FONT.sm,
-      color: COLORS.primary,
-      fontWeight: String(FONT.semibold) as any,
-    },
-    inatUser: {
-      fontSize: FONT.md,
-      color: COLORS.text,
-      marginTop: 2,
-    },
-    disconnectBtn: {
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xs,
-    },
-    disconnectText: {
-      fontSize: FONT.sm,
-      color: COLORS.danger ?? '#C0392B',
-    },
-    inatForm: {
+    inatCard: {
       backgroundColor: COLORS.surface,
       borderRadius: RADIUS.md,
       borderWidth: 1,
@@ -305,23 +270,48 @@ function makeStyles(COLORS: ColorPalette) {
       marginBottom: SPACING.md,
       gap: SPACING.sm,
     },
-    input: {
+    inatStatus: {
+      fontSize: FONT.md,
+      color: COLORS.primary,
+      fontWeight: String(FONT.semibold) as any,
+    },
+    inatExpired: {
+      fontSize: FONT.sm,
+      color: COLORS.danger ?? '#C0392B',
+      fontWeight: String(FONT.medium) as any,
+    },
+    clearBtn: {
+      alignSelf: 'flex-start',
+    },
+    clearBtnText: {
+      fontSize: FONT.sm,
+      color: COLORS.danger ?? '#C0392B',
+    },
+    inatInstructions: {
+      fontSize: FONT.sm,
+      color: COLORS.textSecondary,
+      lineHeight: 20,
+    },
+    tokenInput: {
       backgroundColor: COLORS.surfaceAlt,
       borderRadius: RADIUS.sm,
       borderWidth: 1,
       borderColor: COLORS.border,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm,
-      fontSize: FONT.md,
+      fontSize: 12,
       color: COLORS.text,
+      fontFamily: 'monospace',
+      minHeight: 72,
+      textAlignVertical: 'top',
     },
-    connectBtn: {
+    saveBtn: {
       backgroundColor: COLORS.primary,
       borderRadius: RADIUS.sm,
       paddingVertical: SPACING.sm,
       alignItems: 'center',
     },
-    connectText: {
+    saveBtnText: {
       color: COLORS.textOnPrimary,
       fontWeight: String(FONT.semibold) as any,
       fontSize: FONT.md,

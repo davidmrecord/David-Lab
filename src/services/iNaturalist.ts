@@ -14,7 +14,7 @@ export interface FishIdResult {
 export async function identifyFish(photoUri: string): Promise<FishIdResult> {
   const token = await getApiToken();
   if (!token) {
-    throw new Error('Not connected to iNaturalist. Go to Settings to log in.');
+    throw new Error('No iNaturalist token. Paste one in Settings → Fish ID.');
   }
 
   const formData = new FormData();
