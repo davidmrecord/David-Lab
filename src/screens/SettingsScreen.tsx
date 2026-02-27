@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,6 +19,9 @@ import {
   exchangeAndStoreToken,
   signOut,
   isSignedIn,
+  saveToken,
+  getTokenStatus,
+  clearToken,
   redirectUri,
   CLIENT_ID,
   INAT_AUTHORIZATION_ENDPOINT,
@@ -40,6 +44,9 @@ export default function SettingsScreen({ navigation }: Props) {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [inatSignedIn, setInatSignedIn] = useState(false);
   const [inatLoading, setInatLoading] = useState(false);
+  const [inatTokenSaved, setInatTokenSaved] = useState(false);
+  const [inatTokenExpired, setInatTokenExpired] = useState(false);
+  const [inatTokenInput, setInatTokenInput] = useState('');
 
   // OAuth Authorization Code request — iNaturalist doesn't support PKCE.
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
@@ -49,6 +56,9 @@ export default function SettingsScreen({ navigation }: Props) {
 
   const refreshSignInStatus = useCallback(async () => {
     setInatSignedIn(await isSignedIn());
+    const status = await getTokenStatus();
+    setInatTokenSaved(status.saved);
+    setInatTokenExpired(status.expired);
   }, []);
 
   useEffect(() => {
@@ -83,6 +93,32 @@ export default function SettingsScreen({ navigation }: Props) {
         style: 'destructive',
         onPress: async () => {
           await signOut();
+          await refreshSignInStatus();
+        },
+      },
+    ]);
+  };
+
+  const handleSaveToken = async () => {
+    const trimmed = inatTokenInput.trim();
+    if (!trimmed) return;
+    try {
+      await saveToken(trimmed);
+      setInatTokenInput('');
+      await refreshSignInStatus();
+    } catch (e: any) {
+      Alert.alert('Invalid token', e.message ?? 'Could not save token.');
+    }
+  };
+
+  const handleClearToken = () => {
+    Alert.alert('Remove token', 'Fish ID will stop working until you add a new token.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await clearToken();
           await refreshSignInStatus();
         },
       },
@@ -138,11 +174,19 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={styles.clearBtnText}>Sign out</Text>
             </TouchableOpacity>
           </>
+        ) : inatTokenSaved && !inatTokenExpired ? (
+          <>
+            <Text style={styles.inatStatus}>Token active — fish ID enabled</Text>
+            <TouchableOpacity onPress={handleClearToken} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>Remove token</Text>
+            </TouchableOpacity>
+          </>
         ) : (
           <>
-            <Text style={styles.inatHint}>
-              Sign in to enable automatic fish identification. Supports Google login.
-            </Text>
+            {inatTokenSaved && inatTokenExpired && (
+              <Text style={styles.inatExpired}>Token expired — paste a new one below.</Text>
+            )}
+            {/* OAuth sign-in (requires a registered iNaturalist OAuth app) */}
             <TouchableOpacity
               style={[styles.saveBtn, (!request || inatLoading) && { opacity: 0.5 }]}
               onPress={handleSignIn}
@@ -152,6 +196,32 @@ export default function SettingsScreen({ navigation }: Props) {
                 {inatLoading ? 'Signing in…' : 'Sign in with iNaturalist'}
               </Text>
             </TouchableOpacity>
+            <Text style={styles.inatDivider}>or paste a token manually</Text>
+            {/* Manual token fallback */}
+            <Text style={styles.inatInstructions}>
+              {'1. Log in at inaturalist.org\n2. Go to inaturalist.org/users/api_token\n3. Copy and paste the token here'}
+            </Text>
+            <TextInput
+              style={styles.tokenInput}
+              placeholder="Paste token here…"
+              placeholderTextColor={COLORS.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              multiline
+              numberOfLines={3}
+              value={inatTokenInput}
+              onChangeText={setInatTokenInput}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtnSecondary, !inatTokenInput.trim() && { opacity: 0.4 }]}
+              onPress={handleSaveToken}
+              disabled={!inatTokenInput.trim()}
+            >
+              <Text style={styles.saveBtnSecondaryText}>Save token</Text>
+            </TouchableOpacity>
+            <Text style={styles.inatHint}>
+              Tokens expire after 24 hours. Sign in above for automatic refresh.
+            </Text>
           </>
         )}
       </View>
@@ -280,6 +350,35 @@ function makeStyles(COLORS: ColorPalette) {
       color: COLORS.primary,
       fontWeight: String(FONT.semibold) as any,
     },
+    inatExpired: {
+      fontSize: FONT.sm,
+      color: COLORS.danger ?? '#C0392B',
+      fontWeight: String(FONT.medium) as any,
+    },
+    inatDivider: {
+      fontSize: FONT.sm,
+      color: COLORS.textSecondary,
+      textAlign: 'center',
+      marginVertical: SPACING.xs,
+    },
+    inatInstructions: {
+      fontSize: FONT.sm,
+      color: COLORS.textSecondary,
+      lineHeight: 20,
+    },
+    tokenInput: {
+      backgroundColor: COLORS.surfaceAlt,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      fontSize: 12,
+      color: COLORS.text,
+      fontFamily: 'monospace',
+      minHeight: 72,
+      textAlignVertical: 'top',
+    },
     clearBtn: {
       alignSelf: 'flex-start',
     },
@@ -295,6 +394,18 @@ function makeStyles(COLORS: ColorPalette) {
     },
     saveBtnText: {
       color: COLORS.textOnPrimary,
+      fontWeight: String(FONT.semibold) as any,
+      fontSize: FONT.md,
+    },
+    saveBtnSecondary: {
+      borderWidth: 1,
+      borderColor: COLORS.primary,
+      borderRadius: RADIUS.sm,
+      paddingVertical: SPACING.sm,
+      alignItems: 'center',
+    },
+    saveBtnSecondaryText: {
+      color: COLORS.primary,
       fontWeight: String(FONT.semibold) as any,
       fontSize: FONT.md,
     },

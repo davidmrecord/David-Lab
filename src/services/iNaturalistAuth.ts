@@ -129,6 +129,32 @@ export async function isSignedIn(): Promise<boolean> {
   return !!token;
 }
 
+// ---------------------------------------------------------------------------
+// Manual token fallback (for accounts that can't register an OAuth app yet)
+// ---------------------------------------------------------------------------
+
+/** Validate and persist a manually-pasted API JWT. */
+export async function saveToken(jwt: string): Promise<void> {
+  const trimmed = jwt.trim();
+  if (!trimmed) throw new Error('Token is empty.');
+  if (trimmed.split('.').length !== 3) throw new Error('Does not look like a valid JWT.');
+  await setSetting('inat_api_jwt', trimmed);
+}
+
+/** Returns { saved, expired } so the UI can show the right state. */
+export async function getTokenStatus(): Promise<{ saved: boolean; expired: boolean }> {
+  const jwt = await getSetting('inat_api_jwt');
+  if (!jwt) return { saved: false, expired: false };
+  const expiry = jwtExpiry(jwt);
+  const expired = expiry ? expiry <= new Date() : false;
+  return { saved: true, expired };
+}
+
+/** Remove only the manually-pasted JWT (does not touch the OAuth access token). */
+export async function clearToken(): Promise<void> {
+  await setSetting('inat_api_jwt', '');
+}
+
 // Expose the authorization endpoint so the settings screen can pass it to
 // useAuthRequest without importing a raw URL string.
 export const INAT_AUTHORIZATION_ENDPOINT = AUTHORIZE_URL;
