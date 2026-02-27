@@ -17,10 +17,12 @@ export async function identifyFish(photoUri: string): Promise<FishIdResult> {
     type: 'image/jpeg',
     name: 'catch.jpg',
   } as any);
-  formData.append('taxon_id', String(FISH_TAXON_IDS[0]));
+  // taxon_id is omitted — it requires auth on iNaturalist's API.
+  // Fish filtering is handled client-side below.
 
   const response = await fetch(API_URL, {
     method: 'POST',
+    headers: { 'User-Agent': 'FishingJournal/1 (mobile app)' },
     body: formData,
   });
 
@@ -33,8 +35,8 @@ export async function identifyFish(photoUri: string): Promise<FishIdResult> {
 
   const suggestions: SpeciesSuggestion[] = results
     .filter((r: any) => {
-      // ancestor_ids may be absent in computervision responses; fall back to
-      // trusting the taxon_id param we already sent to scope results to fish.
+      // ancestor_ids may be absent in computervision responses; if missing,
+      // include the result (API returns broad suggestions, fish are usually top).
       const ancestorIds: number[] | undefined = r.taxon?.ancestor_ids;
       if (!ancestorIds?.length) return true;
       return FISH_TAXON_IDS.some(id => ancestorIds.includes(id));
