@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   avatarBackground: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.07,
+    opacity: 0.5,
   },
   splash: {
     flex: 1,
