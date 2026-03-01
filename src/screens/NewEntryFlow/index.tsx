@@ -183,12 +183,6 @@ export default function NewEntryFlow({ route, navigation }: Props) {
         : '',
     }));
 
-    // Debug: pre-populate notes with raw location data
-    const debugParts: string[] = [];
-    if (locationCoords) debugParts.push(`GPS: ${locationCoords}`);
-    if (locationAddress) debugParts.push(`Address: ${locationAddress}`);
-    if (debugParts.length) setNotes(debugParts.join('\n'));
-
     setStep('review');
   };
 
