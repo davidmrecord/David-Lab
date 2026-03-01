@@ -226,6 +226,13 @@ export async function deleteTrip(id: number): Promise<void> {
   await db.runAsync('DELETE FROM trips WHERE id = ?', [id]);
 }
 
+export async function deleteTripWithCatches(id: number): Promise<void> {
+  const db = await getDb();
+  // Deleting catches cascades to catch_gear automatically (ON DELETE CASCADE).
+  await db.runAsync('DELETE FROM catches WHERE trip_id = ?', [id]);
+  await db.runAsync('DELETE FROM trips WHERE id = ?', [id]);
+}
+
 export async function autoCreateTrip(
   waterBody: string | null,
   datetime: string
