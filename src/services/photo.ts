@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+import * as Location from 'expo-location';
 import { Alert, Linking, Platform } from 'react-native';
 
 export interface PhotoResult {
@@ -44,10 +45,16 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   // Fall back to MediaLibrary.getAssetInfoAsync() which uses ACCESS_MEDIA_LOCATION.
   if (Platform.OS === 'android' && photoResult.latitude === null && asset.assetId) {
     try {
+      // Ensure MediaLibrary permissions are granted before querying asset info.
+      await MediaLibrary.requestPermissionsAsync();
       const info = await MediaLibrary.getAssetInfoAsync(asset.assetId);
       if (info.location) {
-        photoResult.latitude = info.location.latitude;
-        photoResult.longitude = info.location.longitude;
+        const { latitude, longitude } = info.location;
+        // Guard against Android returning {latitude:0, longitude:0} as a default.
+        if (latitude !== 0 || longitude !== 0) {
+          photoResult.latitude = latitude;
+          photoResult.longitude = longitude;
+        }
       }
     } catch {
       // Location enrichment is best-effort; silently ignore.
@@ -70,6 +77,10 @@ export async function takePhoto(): Promise<PhotoResult | null> {
     return null;
   }
 
+  // Get device GPS now — the user is at the fishing spot.
+  // This is more reliable than EXIF for camera captures in Expo Go.
+  const deviceLocation = await getDeviceLocation();
+
   let result;
   try {
     result = await ImagePicker.launchCameraAsync({
@@ -82,7 +93,46 @@ export async function takePhoto(): Promise<PhotoResult | null> {
   }
 
   if (result.canceled || !result.assets?.[0]) return null;
-  return extractAssetData(result.assets[0]);
+
+  const photoResult = extractAssetData(result.assets[0]);
+
+  // Prefer EXIF GPS (most accurate); fall back to device location acquired above.
+  if (photoResult.latitude === null && deviceLocation) {
+    photoResult.latitude = deviceLocation.latitude;
+    photoResult.longitude = deviceLocation.longitude;
+  }
+
+  return photoResult;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Request foreground location permission and return the most recent known
+ * position. Uses getLastKnownPositionAsync (instant) then falls back to
+ * getCurrentPositionAsync with a 5-second timeout to avoid blocking the UI.
+ */
+async function getDeviceLocation(): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+
+    // Try the cached position first — instant and usually fresh enough.
+    const last = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 });
+    if (last) return { latitude: last.coords.latitude, longitude: last.coords.longitude };
+
+    // Fall back to a fresh fix with a 5-second timeout.
+    const fresh = await Promise.race<Location.LocationObject | null>([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+    ]);
+    if (fresh) return { latitude: fresh.coords.latitude, longitude: fresh.coords.longitude };
+  } catch {
+    // Location is best-effort — never block the camera launch.
+  }
+  return null;
 }
 
 function extractAssetData(asset: ImagePicker.ImagePickerAsset): PhotoResult {
