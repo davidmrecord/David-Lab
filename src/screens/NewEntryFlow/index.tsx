@@ -158,6 +158,9 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
     const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
 
+    const locationCoords = (latitude != null && longitude != null) ? formatCoords(latitude, longitude) : null;
+    const locationAddress = geo?.location_address ?? null;
+
     setReview(r => ({
       ...r,
       photoUri,
@@ -170,8 +173,8 @@ export default function NewEntryFlow({ route, navigation }: Props) {
       topSuggestions: fish?.suggestions ?? [],
       waterBody: geo?.water_body ?? '',
       waterBodyType: geo?.water_body_type ?? null,
-      locationCoords: (latitude != null && longitude != null) ? formatCoords(latitude, longitude) : null,
-      locationAddress: geo?.location_address ?? null,
+      locationCoords,
+      locationAddress,
       weatherTempF: weather?.temp_f != null ? String(Math.round(weather.temp_f)) : '',
       weatherCondition: weather?.condition ?? '',
       weatherWindMph: weather?.wind_mph != null ? String(Math.round(weather.wind_mph)) : '',
@@ -179,6 +182,12 @@ export default function NewEntryFlow({ route, navigation }: Props) {
         ? weather.precipitation_in.toFixed(2)
         : '',
     }));
+
+    // Debug: pre-populate notes with raw location data
+    const debugParts: string[] = [];
+    if (locationCoords) debugParts.push(`GPS: ${locationCoords}`);
+    if (locationAddress) debugParts.push(`Address: ${locationAddress}`);
+    if (debugParts.length) setNotes(debugParts.join('\n'));
 
     setStep('review');
   };
@@ -314,6 +323,19 @@ export default function NewEntryFlow({ route, navigation }: Props) {
             placeholderTextColor={COLORS.textSecondary}
           />
         </Field>
+
+        {(review.locationCoords || review.locationAddress) && (
+          <View style={styles.weatherRow}>
+            {review.locationCoords && (
+              <Text style={styles.weatherText}>📍 {review.locationCoords}</Text>
+            )}
+            {review.locationAddress && (
+              <Text style={[styles.weatherText, { marginTop: review.locationCoords ? 2 : 0 }]}>
+                {review.locationAddress}
+              </Text>
+            )}
+          </View>
+        )}
 
         <View style={styles.row}>
           <View style={[styles.field, { flex: 1, marginRight: SPACING.sm }]}>
