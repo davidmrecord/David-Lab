@@ -99,10 +99,11 @@ export async function searchLocations(query: string): Promise<LocationSearchResu
   const params = new URLSearchParams({
     q: query,
     format: 'json',
-    limit: '6',
+    limit: '10',
     addressdetails: '1',
     extratags: '1',
     namedetails: '1',
+    dedupe: '1',
     'accept-language': deviceLocale,
   });
 
