@@ -65,8 +65,6 @@ function AppShell() {
   return (
     <View style={styles.shell}>
       <StatusBar style="light" />
-      <AppNavigator />
-      <OfflineBanner />
       {avatarUri && (
         <View style={styles.avatarBackground} pointerEvents="none">
           <Image
@@ -77,6 +75,8 @@ function AppShell() {
           />
         </View>
       )}
+      <AppNavigator />
+      <OfflineBanner />
     </View>
   );
 }
@@ -87,7 +87,6 @@ const styles = StyleSheet.create({
   },
   avatarBackground: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.5,
   },
   splash: {
     flex: 1,
