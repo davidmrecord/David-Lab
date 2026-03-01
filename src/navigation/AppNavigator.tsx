@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -62,6 +62,7 @@ function JournalNavigator() {
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: colors.textOnPrimary,
         headerTitleStyle: { fontWeight: String(FONT.semibold) as any },
+        contentStyle: { backgroundColor: 'transparent' },
       }}
     >
       <JournalStack.Screen
@@ -116,6 +117,7 @@ function GearNavigator() {
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: colors.textOnPrimary,
         headerTitleStyle: { fontWeight: String(FONT.semibold) as any },
+        contentStyle: { backgroundColor: 'transparent' },
       }}
     >
       <GearStack.Screen
@@ -132,10 +134,12 @@ function GearNavigator() {
   );
 }
 
+const NAV_THEME = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } };
+
 export default function AppNavigator() {
   const { colors } = useTheme();
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={NAV_THEME}>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
