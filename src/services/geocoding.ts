@@ -6,6 +6,13 @@ const BASE_URL = 'https://nominatim.openstreetmap.org/reverse';
 export interface GeocodingResult {
   water_body: string | null;
   water_body_type: WaterBodyType;
+  location_address: string | null; // Nominatim display_name (full human-readable address)
+}
+
+export function formatCoords(lat: number, lon: number): string {
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lonDir = lon >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
 }
 
 function inferWaterBodyType(tags: Record<string, string>): WaterBodyType {
@@ -64,5 +71,6 @@ export async function reverseGeocode(
   return {
     water_body: name,
     water_body_type: inferWaterBodyType(tags),
+    location_address: data.display_name ?? null,
   };
 }

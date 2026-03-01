@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../../theme/ThemeContext';
 import { createCatch, persistPhoto, autoCreateTrip, getAllTripsWithCatches } from '../../db/database';
 import { pickPhotoFromLibrary, takePhoto } from '../../services/photo';
+import { formatCoords } from '../../services/geocoding';
 import type { ColorPalette } from '../../theme/palettes';
 import type { Trip } from '../../types';
 import { SPACING, RADIUS, FONT } from '../../navigation/theme';
@@ -28,6 +29,9 @@ export default function OfflineEntryForm({ initialTripId, onSaved }: Props) {
   const styles = useMemo(() => makeStyles(COLORS), [COLORS]);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationCoords, setLocationCoords] = useState<string | null>(null);
   const [species, setSpecies] = useState('');
   const [weightLbs, setWeightLbs] = useState('');
   const [waterTempF, setWaterTempF] = useState('');
@@ -42,7 +46,14 @@ export default function OfflineEntryForm({ initialTripId, onSaved }: Props) {
 
   const handlePhoto = async (source: 'camera' | 'library') => {
     const result = source === 'camera' ? await takePhoto() : await pickPhotoFromLibrary();
-    if (result) setPhotoUri(result.uri);
+    if (result) {
+      setPhotoUri(result.uri);
+      setLatitude(result.latitude);
+      setLongitude(result.longitude);
+      if (result.latitude != null && result.longitude != null) {
+        setLocationCoords(formatCoords(result.latitude, result.longitude));
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -63,8 +74,8 @@ export default function OfflineEntryForm({ initialTripId, onSaved }: Props) {
         species_scientific: null,
         species_confidence: null,
         caught_at: new Date().toISOString(),
-        latitude: null,
-        longitude: null,
+        latitude,
+        longitude,
         water_body: null,
         water_body_type: null,
         weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
@@ -74,6 +85,8 @@ export default function OfflineEntryForm({ initialTripId, onSaved }: Props) {
         weather_condition: null,
         weather_wind_mph: null,
         weather_precipitation_in: null,
+        location_coords: locationCoords,
+        location_address: null, // filled on sync
         needs_sync: 1,
         synced_at: null,
       });

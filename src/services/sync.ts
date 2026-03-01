@@ -8,7 +8,7 @@ import {
 } from '../db/database';
 import { identifyFish } from './iNaturalist';
 import { fetchHistoricalWeather } from './weather';
-import { reverseGeocode } from './geocoding';
+import { reverseGeocode, formatCoords } from './geocoding';
 import type { Catch, SyncResult } from '../types';
 
 const NOMINATIM_DELAY_MS = 1100; // 1 req/sec limit
@@ -48,12 +48,19 @@ async function enrichCatch(c: Catch): Promise<SyncResult> {
         updates.weather_precipitation_in = w.precipitation_in;
     }
 
-    // 3. Geocoding — only if water_body blank and GPS available
-    if (!c.water_body && c.latitude != null && c.longitude != null) {
-      await sleep(NOMINATIM_DELAY_MS);
-      const geo = await reverseGeocode(c.latitude, c.longitude);
-      if (geo.water_body) updates.water_body = geo.water_body;
-      if (c.water_body_type == null) updates.water_body_type = geo.water_body_type;
+    // 3. Geocoding + raw location — only if GPS available
+    if (c.latitude != null && c.longitude != null) {
+      if (!c.location_coords) {
+        updates.location_coords = formatCoords(c.latitude, c.longitude);
+      }
+      if (!c.water_body || !c.location_address) {
+        await sleep(NOMINATIM_DELAY_MS);
+        const geo = await reverseGeocode(c.latitude, c.longitude);
+        if (!c.water_body && geo.water_body) updates.water_body = geo.water_body;
+        if (c.water_body_type == null) updates.water_body_type = geo.water_body_type;
+        if (!c.location_address && geo.location_address)
+          updates.location_address = geo.location_address;
+      }
     }
 
     await updateCatch(c.id, {

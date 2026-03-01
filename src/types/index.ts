@@ -35,6 +35,8 @@ export interface Catch {
   weather_condition: string | null;
   weather_wind_mph: number | null;
   weather_precipitation_in: number | null;
+  location_coords: string | null;   // "41.2345° N, 109.4567° W" — formatted from EXIF GPS
+  location_address: string | null;  // full address from Nominatim display_name
   needs_sync: 0 | 1;
   synced_at: string | null;
   created_at: string;
@@ -102,6 +104,20 @@ export interface SpeciesSuggestion {
   common_name: string | null;
   scientific_name: string;
   confidence: number; // 0–1
+}
+
+// Gallery
+
+export interface GalleryCatch extends Catch {
+  trip_title: string | null;
+}
+
+export interface GalleryFilters {
+  species?: string;
+  tripId?: number;
+  waterBody?: string;
+  dateFrom?: string; // ISO date "YYYY-MM-DD"
+  dateTo?: string;   // ISO date "YYYY-MM-DD"
 }
 
 // Sync

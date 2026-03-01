@@ -1,8 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
-import type { Trip, Catch, Gear, WaterBodyType } from '../types';
+import type { Trip, Catch, Gear, WaterBodyType, GalleryCatch, GalleryFilters } from '../types';
 
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -95,7 +95,13 @@ async function runMigrations(
     `);
   }
 
-  // Future: if (fromVersion < 2) { ... PRAGMA user_version = 2; }
+  if (fromVersion < 2) {
+    await db.execAsync(`
+      ALTER TABLE catches ADD COLUMN location_coords TEXT;
+      ALTER TABLE catches ADD COLUMN location_address TEXT;
+      PRAGMA user_version = 2;
+    `);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -259,8 +265,9 @@ export async function createCatch(
       caught_at, latitude, longitude, water_body, water_body_type,
       weight_lbs, water_temp_f, notes,
       weather_temp_f, weather_condition, weather_wind_mph, weather_precipitation_in,
+      location_coords, location_address,
       needs_sync, synced_at, created_at, updated_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       data.trip_id ?? null, data.photo_uri ?? null,
       data.species ?? null, data.species_scientific ?? null, data.species_confidence ?? null,
@@ -269,6 +276,7 @@ export async function createCatch(
       data.weight_lbs ?? null, data.water_temp_f ?? null, data.notes ?? null,
       data.weather_temp_f ?? null, data.weather_condition ?? null,
       data.weather_wind_mph ?? null, data.weather_precipitation_in ?? null,
+      data.location_coords ?? null, data.location_address ?? null,
       data.needs_sync, data.synced_at ?? null, now, now,
     ]
   );
@@ -375,4 +383,47 @@ export async function setGearForCatch(
       [catchId, gearId]
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Gallery
+// ---------------------------------------------------------------------------
+
+export async function getAllCatchesForGallery(
+  filters?: GalleryFilters
+): Promise<GalleryCatch[]> {
+  const db = await getDb();
+  const conditions: string[] = ['c.photo_uri IS NOT NULL'];
+  const params: (string | number)[] = [];
+
+  if (filters?.species) {
+    conditions.push('c.species LIKE ?');
+    params.push(`%${filters.species}%`);
+  }
+  if (filters?.tripId !== undefined) {
+    conditions.push('c.trip_id = ?');
+    params.push(filters.tripId);
+  }
+  if (filters?.waterBody) {
+    conditions.push('c.water_body LIKE ?');
+    params.push(`%${filters.waterBody}%`);
+  }
+  if (filters?.dateFrom) {
+    conditions.push('c.caught_at >= ?');
+    params.push(filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    conditions.push('c.caught_at <= ?');
+    params.push(`${filters.dateTo}T23:59:59`);
+  }
+
+  const where = conditions.join(' AND ');
+  return db.getAllAsync<GalleryCatch>(
+    `SELECT c.*, t.title as trip_title
+     FROM catches c
+     LEFT JOIN trips t ON t.id = c.trip_id
+     WHERE ${where}
+     ORDER BY c.caught_at DESC`,
+    params
+  );
 }
