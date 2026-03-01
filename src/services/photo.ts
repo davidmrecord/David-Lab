@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Alert, Linking, Platform } from 'react-native';
 
 export interface PhotoResult {
@@ -35,7 +36,25 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   }
 
   if (result.canceled || !result.assets?.[0]) return null;
-  return extractAssetData(result.assets[0]);
+
+  const asset = result.assets[0];
+  const photoResult = extractAssetData(asset);
+
+  // On Android, EXIF GPS is often stripped from Google Photos / cloud assets.
+  // Fall back to MediaLibrary.getAssetInfoAsync() which uses ACCESS_MEDIA_LOCATION.
+  if (Platform.OS === 'android' && photoResult.latitude === null && asset.assetId) {
+    try {
+      const info = await MediaLibrary.getAssetInfoAsync(asset.assetId);
+      if (info.location) {
+        photoResult.latitude = info.location.latitude;
+        photoResult.longitude = info.location.longitude;
+      }
+    } catch {
+      // Location enrichment is best-effort; silently ignore.
+    }
+  }
+
+  return photoResult;
 }
 
 export async function takePhoto(): Promise<PhotoResult | null> {
@@ -74,8 +93,13 @@ function extractAssetData(asset: ImagePicker.ImagePickerAsset): PhotoResult {
 
   if (exif) {
     if (exif.GPSLatitude != null && exif.GPSLongitude != null) {
-      latitude = toDecimalDegrees(exif.GPSLatitude, exif.GPSLatitudeRef ?? 'N');
-      longitude = toDecimalDegrees(exif.GPSLongitude, exif.GPSLongitudeRef ?? 'E');
+      const lat = toDecimalDegrees(exif.GPSLatitude, exif.GPSLatitudeRef ?? 'N');
+      const lon = toDecimalDegrees(exif.GPSLongitude, exif.GPSLongitudeRef ?? 'E');
+      // Guard against Android returning 0,0 when GPS is unavailable (instead of null).
+      if (lat !== 0 || lon !== 0) {
+        latitude = lat;
+        longitude = lon;
+      }
     }
     if (exif.DateTimeOriginal) {
       // EXIF format: "YYYY:MM:DD HH:MM:SS"
