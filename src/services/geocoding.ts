@@ -34,17 +34,22 @@ export async function reverseGeocode(
   latitude: number,
   longitude: number
 ): Promise<GeocodingResult> {
+  // Use device locale so Nominatim returns names in the user's language.
+  const deviceLocale = Intl.DateTimeFormat().resolvedOptions().locale || 'en';
+
   const params = new URLSearchParams({
     lat: String(latitude),
     lon: String(longitude),
     format: 'jsonv2',
     namedetails: '1',
     zoom: '14',
+    'accept-language': deviceLocale,
   });
 
   const response = await fetch(`${BASE_URL}?${params}`, {
     headers: {
       'User-Agent': 'FishingJournalApp/1.0 (personal mobile app, not for redistribution)',
+      'Accept-Language': deviceLocale,
     },
   });
 
