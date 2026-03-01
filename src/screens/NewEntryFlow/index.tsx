@@ -21,7 +21,7 @@ import {
 } from '../../db/database';
 import { identifyFish } from '../../services/iNaturalist';
 import { fetchHistoricalWeather } from '../../services/weather';
-import { reverseGeocode } from '../../services/geocoding';
+import { reverseGeocode, formatCoords } from '../../services/geocoding';
 import { pickPhotoFromLibrary, takePhoto } from '../../services/photo';
 import TroutLoader from '../../components/TroutLoader';
 import OfflineEntryForm from './OfflineEntryForm';
@@ -44,6 +44,8 @@ interface ReviewData {
   topSuggestions: SpeciesSuggestion[];
   waterBody: string;
   waterBodyType: WaterBodyType | null;
+  locationCoords: string | null;
+  locationAddress: string | null;
   weatherTempF: string;
   weatherCondition: string;
   weatherWindMph: string;
@@ -69,6 +71,8 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     topSuggestions: [],
     waterBody: '',
     waterBodyType: null,
+    locationCoords: null,
+    locationAddress: null,
     weatherTempF: '',
     weatherCondition: '',
     weatherWindMph: '',
@@ -154,12 +158,6 @@ export default function NewEntryFlow({ route, navigation }: Props) {
     const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
     const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
 
-    // DEBUG
-    const fishDetail = fishResult.status === 'rejected'
-      ? `ERR: ${String(fishResult.reason)}`
-      : JSON.stringify(fishResult.value);
-    setNotes(`fish: ${fishResult.status}\n${fishDetail}`);
-
     setReview(r => ({
       ...r,
       photoUri,
@@ -172,6 +170,8 @@ export default function NewEntryFlow({ route, navigation }: Props) {
       topSuggestions: fish?.suggestions ?? [],
       waterBody: geo?.water_body ?? '',
       waterBodyType: geo?.water_body_type ?? null,
+      locationCoords: (latitude != null && longitude != null) ? formatCoords(latitude, longitude) : null,
+      locationAddress: geo?.location_address ?? null,
       weatherTempF: weather?.temp_f != null ? String(Math.round(weather.temp_f)) : '',
       weatherCondition: weather?.condition ?? '',
       weatherWindMph: weather?.wind_mph != null ? String(Math.round(weather.wind_mph)) : '',
@@ -218,6 +218,8 @@ export default function NewEntryFlow({ route, navigation }: Props) {
         weather_precipitation_in: review.weatherPrecipIn
           ? parseFloat(review.weatherPrecipIn)
           : null,
+        location_coords: review.locationCoords,
+        location_address: review.locationAddress,
         needs_sync: 0,
         synced_at: new Date().toISOString(),
       });

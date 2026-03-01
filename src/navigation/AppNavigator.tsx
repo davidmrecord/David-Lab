@@ -19,6 +19,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import GearLibraryScreen from '../screens/GearLibraryScreen';
 import AddGearScreen from '../screens/AddGearScreen';
 import NewEntryFlow from '../screens/NewEntryFlow';
+import GalleryScreen from '../screens/GalleryScreen';
 
 // ---------------------------------------------------------------------------
 // Route param types
@@ -40,11 +41,20 @@ export type GearStackParams = {
   AddGear: { gearId?: number } | undefined;
 };
 
+export type GalleryStackParams = {
+  GalleryList: undefined;
+  CatchDetail: { catchId: number };
+  EditCatch: { catchId: number };
+};
+
 export type JournalScreenProps<T extends keyof JournalStackParams> =
   NativeStackScreenProps<JournalStackParams, T>;
 
 export type GearScreenProps<T extends keyof GearStackParams> =
   NativeStackScreenProps<GearStackParams, T>;
+
+export type GalleryScreenProps<T extends keyof GalleryStackParams> =
+  NativeStackScreenProps<GalleryStackParams, T>;
 
 // ---------------------------------------------------------------------------
 // Stacks
@@ -52,6 +62,7 @@ export type GearScreenProps<T extends keyof GearStackParams> =
 
 const JournalStack = createNativeStackNavigator<JournalStackParams>();
 const GearStack = createNativeStackNavigator<GearStackParams>();
+const GalleryStack = createNativeStackNavigator<GalleryStackParams>();
 const Tab = createBottomTabNavigator();
 
 function JournalNavigator() {
@@ -134,6 +145,36 @@ function GearNavigator() {
   );
 }
 
+function GalleryNavigator() {
+  const { colors } = useTheme();
+  return (
+    <GalleryStack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.primary },
+        headerTintColor: colors.textOnPrimary,
+        headerTitleStyle: { fontWeight: String(FONT.semibold) as any },
+        contentStyle: { backgroundColor: 'transparent' },
+      }}
+    >
+      <GalleryStack.Screen
+        name="GalleryList"
+        component={GalleryScreen}
+        options={{ title: 'Gallery' }}
+      />
+      <GalleryStack.Screen
+        name="CatchDetail"
+        component={CatchDetailScreen as any}
+        options={{ title: 'Catch' }}
+      />
+      <GalleryStack.Screen
+        name="EditCatch"
+        component={EditCatchScreen as any}
+        options={{ title: 'Edit Catch' }}
+      />
+    </GalleryStack.Navigator>
+  );
+}
+
 const NAV_THEME = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: 'transparent' } };
 
 export default function AppNavigator() {
@@ -158,6 +199,11 @@ export default function AppNavigator() {
           name="GearTab"
           component={GearNavigator}
           options={{ tabBarLabel: 'Gear', tabBarIcon: () => <Text>🪝</Text> }}
+        />
+        <Tab.Screen
+          name="GalleryTab"
+          component={GalleryNavigator}
+          options={{ tabBarLabel: 'Gallery', tabBarIcon: () => <Text>📷</Text> }}
         />
       </Tab.Navigator>
     </NavigationContainer>
