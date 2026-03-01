@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { getCatchById, deleteCatch } from '../db/database';
+import MapPinWidget from '../components/MapPinWidget';
 import type { ColorPalette } from '../theme/palettes';
 import type { Catch } from '../types';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
@@ -94,17 +95,21 @@ export default function CatchDetailScreen({ route, navigation }: Props) {
         )}
       </View>
 
+      {/* Map widget — shown when GPS coordinates are available */}
+      {catch_.latitude != null && catch_.longitude != null && (
+        <MapPinWidget
+          latitude={catch_.latitude}
+          longitude={catch_.longitude}
+          locationCoords={catch_.location_coords}
+          locationAddress={catch_.location_address}
+        />
+      )}
+
       {/* Details grid */}
       <View style={styles.grid}>
         <Detail label="Date" value={date} />
         <Detail label="Water body" value={catch_.water_body ?? '—'} />
         <Detail label="Water type" value={catch_.water_body_type ?? '—'} />
-        {catch_.location_coords != null && (
-          <Detail label="GPS" value={catch_.location_coords} />
-        )}
-        {catch_.location_address != null && (
-          <Detail label="Address" value={catch_.location_address} />
-        )}
         <Detail label="Weight" value={catch_.weight_lbs ? `${catch_.weight_lbs} lbs` : '—'} />
         <Detail label="Water temp" value={catch_.water_temp_f ? `${catch_.water_temp_f}°F` : '—'} />
       </View>

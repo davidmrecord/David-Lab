@@ -24,6 +24,7 @@ import { fetchHistoricalWeather } from '../../services/weather';
 import { reverseGeocode, formatCoords } from '../../services/geocoding';
 import { pickPhotoFromLibrary, takePhoto } from '../../services/photo';
 import TroutLoader from '../../components/TroutLoader';
+import MapPinWidget from '../../components/MapPinWidget';
 import OfflineEntryForm from './OfflineEntryForm';
 import type { ColorPalette } from '../../theme/palettes';
 import type { Trip, SpeciesSuggestion, WaterBodyType } from '../../types';
@@ -318,17 +319,13 @@ export default function NewEntryFlow({ route, navigation }: Props) {
           />
         </Field>
 
-        {(review.locationCoords || review.locationAddress) && (
-          <View style={styles.weatherRow}>
-            {review.locationCoords && (
-              <Text style={styles.weatherText}>📍 {review.locationCoords}</Text>
-            )}
-            {review.locationAddress && (
-              <Text style={[styles.weatherText, { marginTop: review.locationCoords ? 2 : 0 }]}>
-                {review.locationAddress}
-              </Text>
-            )}
-          </View>
+        {review.latitude != null && review.longitude != null && (
+          <MapPinWidget
+            latitude={review.latitude}
+            longitude={review.longitude}
+            locationCoords={review.locationCoords}
+            locationAddress={review.locationAddress}
+          />
         )}
 
         <View style={styles.row}>

@@ -61,6 +61,18 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
     }
   }
 
+  // Final fallback: Android 14+ Google Photos cloud assets frequently have no
+  // accessible GPS metadata at all. Use the current device location so that a
+  // fresh catch logged at the spot gets coordinates even when picking from the
+  // library instead of using the in-app camera.
+  if (photoResult.latitude === null) {
+    const deviceLoc = await getDeviceLocation();
+    if (deviceLoc) {
+      photoResult.latitude = deviceLoc.latitude;
+      photoResult.longitude = deviceLoc.longitude;
+    }
+  }
+
   return photoResult;
 }
 
