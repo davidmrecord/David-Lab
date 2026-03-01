@@ -52,7 +52,7 @@ export default function MapPinWidget({
     [latitude, longitude],
   );
 
-  const tileUrl = `https://tile.openstreetmap.org/${ZOOM}/${tileX}/${tileY}.png`;
+  const tileUrl = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${ZOOM}/${tileX}/${tileY}.png`;
 
   // Pin tip lands at (fracX * mapWidth, fracY * MAP_H).
   // The SVG pin is PIN_W × PIN_H with its tip at bottom-centre.
@@ -89,7 +89,7 @@ export default function MapPinWidget({
             </Svg>
           </View>
         )}
-        <Text style={styles.attribution}>© OpenStreetMap</Text>
+        <Text style={styles.attribution}>© OpenStreetMap · © CARTO</Text>
       </View>
 
       {/* Collapsible location text */}
