@@ -41,16 +41,16 @@ export async function pickPhotoFromLibrary(): Promise<PhotoResult | null> {
   const asset = result.assets[0];
   const photoResult = extractAssetData(asset);
 
-  // On Android, EXIF GPS is often stripped from Google Photos / cloud assets.
-  // Fall back to MediaLibrary.getAssetInfoAsync() which uses ACCESS_MEDIA_LOCATION.
-  if (Platform.OS === 'android' && photoResult.latitude === null && asset.assetId) {
+  // EXIF GPS is often stripped from Google Photos / cloud assets on both platforms.
+  // Fall back to MediaLibrary.getAssetInfoAsync() which reads it from the asset
+  // metadata (ACCESS_MEDIA_LOCATION on Android, PHAsset on iOS).
+  if (photoResult.latitude === null && asset.assetId) {
     try {
-      // Ensure MediaLibrary permissions are granted before querying asset info.
       await MediaLibrary.requestPermissionsAsync();
       const info = await MediaLibrary.getAssetInfoAsync(asset.assetId);
       if (info.location) {
         const { latitude, longitude } = info.location;
-        // Guard against Android returning {latitude:0, longitude:0} as a default.
+        // Guard against devices returning {latitude:0, longitude:0} as a default.
         if (latitude !== 0 || longitude !== 0) {
           photoResult.latitude = latitude;
           photoResult.longitude = longitude;
@@ -169,11 +169,13 @@ function extractAssetData(asset: ImagePicker.ImagePickerAsset): PhotoResult {
 }
 
 function toDecimalDegrees(value: number | number[], ref: string): number {
-  let decimal: number;
   if (Array.isArray(value)) {
-    decimal = value[0] + value[1] / 60 + value[2] / 3600;
-  } else {
-    decimal = value;
+    // Standard EXIF DMS: values are always unsigned; ref gives the hemisphere.
+    const decimal = value[0] + value[1] / 60 + value[2] / 3600;
+    return ref === 'S' || ref === 'W' ? -decimal : decimal;
   }
-  return ref === 'S' || ref === 'W' ? -decimal : decimal;
+  // Scalar path: some EXIF parsers (Android) return pre-signed decimal degrees.
+  // If already negative, trust the sign — applying the ref would double-negate it.
+  if (value < 0) return value;
+  return ref === 'S' || ref === 'W' ? -value : value;
 }
