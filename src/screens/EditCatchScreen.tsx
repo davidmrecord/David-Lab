@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -14,7 +15,8 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { getCatchById, updateCatch, getAllGear, persistPhoto, getGearForCatch, setGearForCatch } from '../db/database';
 import { pickPhotoFromLibrary, getDeviceLocation } from '../services/photo';
-import { reverseGeocode, formatCoords } from '../services/geocoding';
+import { reverseGeocode, formatCoords, searchLocations } from '../services/geocoding';
+import type { LocationSearchResult } from '../services/geocoding';
 import MapPinWidget from '../components/MapPinWidget';
 import type { ColorPalette } from '../theme/palettes';
 import type { Gear, WaterBodyType } from '../types';
@@ -42,6 +44,9 @@ export default function EditCatchScreen({ route, navigation }: Props) {
   const [allGear, setAllGear] = useState<Gear[]>([]);
   const [selectedGearIds, setSelectedGearIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const [updatingLocation, setUpdatingLocation] = useState(false);
 
   useEffect(() => {
@@ -70,7 +75,52 @@ export default function EditCatchScreen({ route, navigation }: Props) {
     if (result) setPhotoUri(result.uri);
   };
 
-  const handleUpdateLocation = async () => {
+  const applyLocation = (
+    lat: number,
+    lon: number,
+    coords: string,
+    address: string | null,
+    wbType: WaterBodyType | null,
+    wbName: string | null,
+  ) => {
+    setLatitude(lat);
+    setLongitude(lon);
+    setLocationCoords(coords);
+    setLocationAddress(address);
+    setWaterBodyType(wbType);
+    if (!waterBody.trim() && wbName) setWaterBody(wbName);
+    setSearchResults([]);
+    setLocationSearch('');
+  };
+
+  const handleSearch = async () => {
+    const q = locationSearch.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const results = await searchLocations(q);
+      setSearchResults(results);
+      if (results.length === 0) Alert.alert('No results', 'Try a different place name.');
+    } catch {
+      Alert.alert('Search failed', 'Could not reach location service. Check your connection.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectResult = (result: LocationSearchResult) => {
+    const coords = formatCoords(result.latitude, result.longitude);
+    applyLocation(
+      result.latitude,
+      result.longitude,
+      coords,
+      result.display_name,
+      result.water_body_type,
+      result.name,
+    );
+  };
+
+  const handleUseGPS = async () => {
     setUpdatingLocation(true);
     try {
       const loc = await getDeviceLocation();
@@ -79,19 +129,17 @@ export default function EditCatchScreen({ route, navigation }: Props) {
         return;
       }
       const coords = formatCoords(loc.latitude, loc.longitude);
-      setLatitude(loc.latitude);
-      setLongitude(loc.longitude);
-      setLocationCoords(coords);
-      // Run reverse geocode to fill address + water body type.
+      // Run reverse geocode best-effort.
+      let address: string | null = null;
+      let wbType: WaterBodyType | null = null;
+      let wbName: string | null = null;
       try {
         const geo = await reverseGeocode(loc.latitude, loc.longitude);
-        setLocationAddress(geo.location_address);
-        setWaterBodyType(geo.water_body_type);
-        // Only fill water body if the field is currently blank.
-        if (!waterBody.trim() && geo.water_body) setWaterBody(geo.water_body);
-      } catch {
-        // Geocoding is best-effort; coordinates are saved regardless.
-      }
+        address = geo.location_address;
+        wbType = geo.water_body_type;
+        wbName = geo.water_body;
+      } catch { /* silently ignore */ }
+      applyLocation(loc.latitude, loc.longitude, coords, address, wbType, wbName);
     } finally {
       setUpdatingLocation(false);
     }
@@ -164,6 +212,8 @@ export default function EditCatchScreen({ route, navigation }: Props) {
         {/* Location */}
         <View style={styles.field}>
           <Text style={styles.label}>Location</Text>
+
+          {/* Current location card */}
           {latitude != null && longitude != null && (
             <MapPinWidget
               latitude={latitude}
@@ -172,14 +222,58 @@ export default function EditCatchScreen({ route, navigation }: Props) {
               locationAddress={locationAddress}
             />
           )}
+
+          {/* Search row */}
+          <View style={styles.searchRow}>
+            <TextInput
+              style={[styles.input, styles.searchInput]}
+              value={locationSearch}
+              onChangeText={setLocationSearch}
+              placeholder="Search for a place…"
+              placeholderTextColor={COLORS.textSecondary}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
+            />
+            <TouchableOpacity
+              style={[styles.searchBtn, searching && styles.locationBtnDisabled]}
+              onPress={handleSearch}
+              disabled={searching}
+            >
+              {searching
+                ? <ActivityIndicator size="small" color={COLORS.textOnPrimary} />
+                : <Text style={styles.searchBtnText}>Search</Text>}
+            </TouchableOpacity>
+          </View>
+
+          {/* Search results */}
+          {searchResults.length > 0 && (
+            <View style={styles.resultsList}>
+              {searchResults.map((r, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.resultItem, i > 0 && styles.resultItemBorder]}
+                  onPress={() => handleSelectResult(r)}
+                >
+                  <Text style={styles.resultName} numberOfLines={1}>
+                    {r.name ?? r.display_name}
+                  </Text>
+                  <Text style={styles.resultAddress} numberOfLines={1}>
+                    {r.display_name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* GPS button */}
           <TouchableOpacity
             style={[styles.locationBtn, updatingLocation && styles.locationBtnDisabled]}
-            onPress={handleUpdateLocation}
+            onPress={handleUseGPS}
             disabled={updatingLocation}
           >
-            <Text style={styles.locationBtnText}>
-              {updatingLocation ? '…Getting location' : latitude != null ? '📍 Update location' : '📍 Use current location'}
-            </Text>
+            {updatingLocation
+              ? <ActivityIndicator size="small" color={COLORS.primary} />
+              : <Text style={styles.locationBtnText}>📍 Use current GPS</Text>}
           </TouchableOpacity>
         </View>
 
@@ -302,6 +396,63 @@ function makeStyles(COLORS: ColorPalette) {
     },
     multiline: { height: 80, textAlignVertical: 'top' },
     row: { flexDirection: 'row' },
+    searchRow: { flexDirection: 'row', gap: SPACING.xs, marginBottom: SPACING.xs },
+    searchInput: { flex: 1, marginBottom: 0 },
+    searchBtn: {
+      backgroundColor: COLORS.primary,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: SPACING.md,
+      justifyContent: 'center',
+      minWidth: 70,
+      alignItems: 'center',
+    },
+    searchBtnText: {
+      color: COLORS.textOnPrimary,
+      fontSize: FONT.sm,
+      fontWeight: String(FONT.medium) as any,
+    },
+    resultsList: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginBottom: SPACING.xs,
+      overflow: 'hidden',
+    },
+    resultItem: { padding: SPACING.sm },
+    resultItemBorder: { borderTopWidth: 1, borderTopColor: COLORS.border },
+    resultName: { fontSize: FONT.sm, color: COLORS.text, fontWeight: '600' },
+    resultAddress: { fontSize: FONT.xs ?? FONT.sm, color: COLORS.textSecondary, marginTop: 1 },
+    searchRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
+    searchInput: { flex: 1, marginBottom: 0 },
+    searchBtn: {
+      backgroundColor: COLORS.primary,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: SPACING.md,
+      justifyContent: 'center',
+      minWidth: 72,
+      alignItems: 'center',
+    },
+    searchBtnText: {
+      color: COLORS.textOnPrimary,
+      fontSize: FONT.sm,
+      fontWeight: String(FONT.semibold) as any,
+    },
+    resultsList: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginBottom: SPACING.sm,
+      overflow: 'hidden',
+    },
+    resultItem: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    resultItemBorder: { borderTopWidth: 1, borderTopColor: COLORS.border },
+    resultName: { fontSize: FONT.sm, color: COLORS.text, fontWeight: '600' },
+    resultAddress: { fontSize: FONT.xs, color: COLORS.textSecondary, marginTop: 1 },
     locationBtn: {
       borderWidth: 1,
       borderColor: COLORS.primary,
