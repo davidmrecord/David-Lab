@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,9 +13,11 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { getCatchById, updateCatch, getAllGear, persistPhoto, getGearForCatch, setGearForCatch } from '../db/database';
-import { pickPhotoFromLibrary } from '../services/photo';
+import { pickPhotoFromLibrary, getDeviceLocation } from '../services/photo';
+import { reverseGeocode, formatCoords } from '../services/geocoding';
+import MapPinWidget from '../components/MapPinWidget';
 import type { ColorPalette } from '../theme/palettes';
-import type { Gear } from '../types';
+import type { Gear, WaterBodyType } from '../types';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
 
@@ -31,9 +34,15 @@ export default function EditCatchScreen({ route, navigation }: Props) {
   const [weightLbs, setWeightLbs] = useState('');
   const [waterTempF, setWaterTempF] = useState('');
   const [notes, setNotes] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationCoords, setLocationCoords] = useState<string | null>(null);
+  const [locationAddress, setLocationAddress] = useState<string | null>(null);
+  const [waterBodyType, setWaterBodyType] = useState<WaterBodyType | null>(null);
   const [allGear, setAllGear] = useState<Gear[]>([]);
   const [selectedGearIds, setSelectedGearIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
   useEffect(() => {
     Promise.all([getCatchById(catchId), getAllGear(), getGearForCatch(catchId)]).then(
@@ -45,6 +54,11 @@ export default function EditCatchScreen({ route, navigation }: Props) {
         setWeightLbs(c.weight_lbs ? String(c.weight_lbs) : '');
         setWaterTempF(c.water_temp_f ? String(c.water_temp_f) : '');
         setNotes(c.notes ?? '');
+        setLatitude(c.latitude);
+        setLongitude(c.longitude);
+        setLocationCoords(c.location_coords);
+        setLocationAddress(c.location_address);
+        setWaterBodyType(c.water_body_type);
         setAllGear(gear);
         setSelectedGearIds(new Set(catchGear.map(g => g.id)));
       }
@@ -54,6 +68,33 @@ export default function EditCatchScreen({ route, navigation }: Props) {
   const handlePickPhoto = async () => {
     const result = await pickPhotoFromLibrary();
     if (result) setPhotoUri(result.uri);
+  };
+
+  const handleUpdateLocation = async () => {
+    setUpdatingLocation(true);
+    try {
+      const loc = await getDeviceLocation();
+      if (!loc) {
+        Alert.alert('Location unavailable', 'Could not get your current location. Please check that location permission is granted.');
+        return;
+      }
+      const coords = formatCoords(loc.latitude, loc.longitude);
+      setLatitude(loc.latitude);
+      setLongitude(loc.longitude);
+      setLocationCoords(coords);
+      // Run reverse geocode to fill address + water body type.
+      try {
+        const geo = await reverseGeocode(loc.latitude, loc.longitude);
+        setLocationAddress(geo.location_address);
+        setWaterBodyType(geo.water_body_type);
+        // Only fill water body if the field is currently blank.
+        if (!waterBody.trim() && geo.water_body) setWaterBody(geo.water_body);
+      } catch {
+        // Geocoding is best-effort; coordinates are saved regardless.
+      }
+    } finally {
+      setUpdatingLocation(false);
+    }
   };
 
   const toggleGear = (id: number) => {
@@ -72,9 +113,14 @@ export default function EditCatchScreen({ route, navigation }: Props) {
       photo_uri: uri,
       species: species.trim() || null,
       water_body: waterBody.trim() || null,
+      water_body_type: waterBodyType,
       weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
       water_temp_f: waterTempF ? parseFloat(waterTempF) : null,
       notes: notes.trim() || null,
+      latitude,
+      longitude,
+      location_coords: locationCoords,
+      location_address: locationAddress,
     });
     await setGearForCatch(catchId, [...selectedGearIds]);
     setSaving(false);
@@ -114,6 +160,29 @@ export default function EditCatchScreen({ route, navigation }: Props) {
             placeholderTextColor={COLORS.textSecondary}
           />
         </Field>
+
+        {/* Location */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Location</Text>
+          {latitude != null && longitude != null && (
+            <MapPinWidget
+              latitude={latitude}
+              longitude={longitude}
+              locationCoords={locationCoords}
+              locationAddress={locationAddress}
+            />
+          )}
+          <TouchableOpacity
+            style={[styles.locationBtn, updatingLocation && styles.locationBtnDisabled]}
+            onPress={handleUpdateLocation}
+            disabled={updatingLocation}
+          >
+            <Text style={styles.locationBtnText}>
+              {updatingLocation ? '…Getting location' : latitude != null ? '📍 Update location' : '📍 Use current location'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.row}>
           <View style={[styles.field, { flex: 1, marginRight: SPACING.sm }]}>
             <Text style={styles.label}>Weight (lbs)</Text>
@@ -233,6 +302,19 @@ function makeStyles(COLORS: ColorPalette) {
     },
     multiline: { height: 80, textAlignVertical: 'top' },
     row: { flexDirection: 'row' },
+    locationBtn: {
+      borderWidth: 1,
+      borderColor: COLORS.primary,
+      borderRadius: RADIUS.md,
+      padding: SPACING.sm,
+      alignItems: 'center',
+    },
+    locationBtnDisabled: { opacity: 0.5 },
+    locationBtnText: {
+      fontSize: FONT.sm,
+      color: COLORS.primary,
+      fontWeight: String(FONT.medium) as any,
+    },
     gearGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
     gearChip: {
       paddingHorizontal: SPACING.md,

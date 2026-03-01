@@ -126,7 +126,7 @@ export async function takePhoto(): Promise<PhotoResult | null> {
  * position. Uses getLastKnownPositionAsync (instant) then falls back to
  * getCurrentPositionAsync with a 5-second timeout to avoid blocking the UI.
  */
-async function getDeviceLocation(): Promise<{ latitude: number; longitude: number } | null> {
+export async function getDeviceLocation(): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return null;
