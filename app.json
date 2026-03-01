@@ -57,6 +57,12 @@
           "savePhotosPermission": "Used to save catch photos.",
           "isAccessMediaLocationEnabled": true
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Used to tag your catch location automatically."
+        }
       ]
     ]
   }

@@ -17,6 +17,7 @@
     "expo-auth-session": "^55.0.6",
     "expo-file-system": "~19.0.21",
     "expo-image-picker": "~17.0.10",
+    "expo-location": "~18.1.0",
     "expo-media-library": "~18.2.1",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
