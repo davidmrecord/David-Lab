@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
-import { getTripById, updateTrip, deleteTrip, deleteTripWithCatches } from '../db/database';
+import { getTripById, updateTrip } from '../db/database';
 import { syncTrip } from '../services/sync';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import type { ColorPalette } from '../theme/palettes';
@@ -42,47 +42,12 @@ export default function TripDetailScreen({ route, navigation }: Props) {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
-          <TouchableOpacity onPress={handleDeleteTrip}>
-            <Text style={{ color: '#FF9494' }}>Delete</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('EditTrip', { tripId })}>
-            <Text style={{ color: COLORS.textOnPrimary, marginRight: SPACING.sm }}>Edit</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('EditTrip', { tripId })}>
+          <Text style={{ color: COLORS.textOnPrimary, marginRight: SPACING.sm }}>Edit</Text>
+        </TouchableOpacity>
       ),
     });
-  }, [navigation, tripId, COLORS, handleDeleteTrip]);
-
-  const handleDeleteTrip = useCallback(() => {
-    if (!trip) return;
-    const catchCount = trip.catches?.length ?? 0;
-    const hasCatches = catchCount > 0;
-    Alert.alert(
-      'Delete trip',
-      hasCatches
-        ? `"${trip.title}" has ${catchCount} catch${catchCount !== 1 ? 'es' : ''}. Delete catches too?`
-        : `Delete "${trip.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        ...(hasCatches ? [{
-          text: 'Delete trip only',
-          onPress: async () => {
-            await deleteTrip(tripId);
-            navigation.goBack();
-          },
-        }] : []),
-        {
-          text: hasCatches ? 'Delete trip + catches' : 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await (hasCatches ? deleteTripWithCatches(tripId) : deleteTrip(tripId));
-            navigation.goBack();
-          },
-        },
-      ]
-    );
-  }, [trip, tripId, navigation]);
+  }, [navigation, tripId, COLORS]);
 
   const handleSync = async () => {
     setSyncing(true);

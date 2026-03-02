@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { getTripById, updateTrip, deleteTrip } from '../db/database';
+import { getTripById, updateTrip, deleteTrip, deleteTripWithCatches } from '../db/database';
 import type { ColorPalette } from '../theme/palettes';
 import type { JournalScreenProps } from '../navigation/AppNavigator';
 import { SPACING, RADIUS, FONT } from '../navigation/theme';
@@ -60,17 +60,28 @@ export default function EditTripScreen({ route, navigation }: Props) {
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete trip', 'All catches will be unlinked. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTrip(tripId);
-          navigation.popToTop();
+    Alert.alert(
+      'Delete Trip',
+      'Do you want to also delete all associated catches?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'No',
+          onPress: async () => {
+            await deleteTrip(tripId);
+            navigation.popToTop();
+          },
         },
-      },
-    ]);
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteTripWithCatches(tripId);
+            navigation.popToTop();
+          },
+        },
+      ]
+    );
   };
 
   return (
